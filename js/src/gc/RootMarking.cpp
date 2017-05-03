@@ -262,7 +262,7 @@ js::gc::GCRuntime::traceRuntimeForMajorGC(JSTracer* trc, AutoLockForExclusiveAcc
         return;
 
     gcstats::AutoPhase ap(stats, gcstats::PHASE_MARK_ROOTS);
-    if (rt->atomsCompartment(lock)->zone()->isCollecting())
+    //if (rt->atomsCompartment()->zone()->isCollecting())
         traceRuntimeAtoms(trc, lock);
     JSCompartment::traceIncomingCrossCompartmentEdgesForZoneGC(trc);
     traceRuntimeCommon(trc, MarkRuntime, lock);
@@ -380,7 +380,7 @@ js::gc::GCRuntime::traceRuntimeCommon(JSTracer* trc, TraceOrMarkRuntime traceOrM
             (*e.op)(trc, e.data);
         }
 
-        /* During GC, we don't mark gray roots at this stage. */
+        // During GC, we don't mark gray roots at this stage.
         if (JSTraceDataOp op = grayRootTracer.op) {
             if (traceOrMark == TraceRuntime)
                 (*op)(trc, grayRootTracer.data);
@@ -522,8 +522,8 @@ BufferGrayRootsTracer::onChild(const JS::GCCellPtr& thing)
 void
 GCRuntime::markBufferedGrayRoots(JS::Zone* zone)
 {
-    MOZ_ASSERT(grayBufferState == GrayBufferState::Okay);
-    MOZ_ASSERT(zone->isGCMarkingGray() || zone->isGCCompacting());
+    /*MOZ_ASSERT(grayBufferState == GrayBufferState::Okay);
+    MOZ_ASSERT(zone->isGCMarkingGray() || zone->isGCCompacting());*/
 
     for (auto cell : zone->gcGrayRoots)
         TraceManuallyBarrieredGenericPointerEdge(&marker, &cell, "buffered gray root");
@@ -537,4 +537,3 @@ GCRuntime::resetBufferedGrayRoots() const
     for (GCZonesIter zone(rt); !zone.done(); zone.next())
         zone->gcGrayRoots.clearAndFree();
 }
-

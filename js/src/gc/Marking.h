@@ -30,9 +30,6 @@ class LazyScript;
 class NativeObject;
 class ObjectGroup;
 class WeakMapBase;
-namespace gc {
-class Arena;
-} // namespace gc
 namespace jit {
 class JitCode;
 } // namespace jit
@@ -213,16 +210,18 @@ class GCMarker : public JSTracer
         linearWeakMarkingDisabled_ = true;
     }
 
-    void delayMarkingArena(gc::Arena* arena);
+    void delayMarkingArena(/*gc::Arena* arena*/);
     void delayMarkingChildren(const void* thing);
-    void markDelayedChildren(gc::Arena* arena);
+    void markDelayedChildren(/*gc::Arena* arena*/);
     MOZ_MUST_USE bool markDelayedChildren(SliceBudget& budget);
     bool hasDelayedChildren() const {
-        return !!unmarkedArenaStackTop;
+        /*return !!unmarkedArenaStackTop;*/
+		return false;
     }
 
     bool isDrained() {
-        return isMarkStackEmpty() && !unmarkedArenaStackTop;
+        /*return isMarkStackEmpty() && !unmarkedArenaStackTop;*/
+		return true;
     }
 
     MOZ_MUST_USE bool drainMarkStack(SliceBudget& budget);
@@ -232,7 +231,7 @@ class GCMarker : public JSTracer
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
 #ifdef DEBUG
-    bool shouldCheckCompartments() { return strictCompartmentChecking; }
+    bool shouldCheckCompartments() { return false; }
 #endif
 
     void markEphemeronValues(gc::Cell* markedCell, gc::WeakEntryVector& entry);
@@ -293,15 +292,15 @@ class GCMarker : public JSTracer
     MOZ_MUST_USE bool mark(T* thing);
 
     void pushTaggedPtr(StackTag tag, void* ptr) {
-        checkZone(ptr);
+        /*checkZone(ptr);*/
         uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
-        MOZ_ASSERT(!(addr & StackTagMask));
+        /*MOZ_ASSERT(!(addr & StackTagMask));*/
         if (!stack.push(addr | uintptr_t(tag)))
             delayMarkingChildren(ptr);
     }
 
     void pushValueArray(JSObject* obj, HeapSlot* start, HeapSlot* end) {
-        checkZone(obj);
+        /*checkZone(obj);*/
 
         MOZ_ASSERT(start <= end);
         uintptr_t tagged = reinterpret_cast<uintptr_t>(obj) | GCMarker::ValueArrayTag;
@@ -331,7 +330,7 @@ class GCMarker : public JSTracer
     uint32_t color;
 
     /* Pointer to the top of the stack of arenas we are delaying marking on. */
-    js::gc::Arena* unmarkedArenaStackTop;
+    /*js::gc::Arena* unmarkedArenaStackTop;*/
 
     /*
      * If the weakKeys table OOMs, disable the linear algorithm and fall back
@@ -365,10 +364,10 @@ namespace gc {
 
 /*** Special Cases ***/
 
-void
-PushArena(GCMarker* gcmarker, Arena* arena);
-
 /*** Liveness ***/
+
+bool
+IsMarkedCell(const TenuredCell* const thingp);
 
 template <typename T>
 bool

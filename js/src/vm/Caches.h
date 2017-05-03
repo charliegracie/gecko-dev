@@ -151,7 +151,7 @@ class NativeIterCache
 class NewObjectCache
 {
     /* Statically asserted to be equal to sizeof(JSObject_Slots16) */
-    static const unsigned MAX_OBJ_SIZE = 4 * sizeof(void*) + 16 * sizeof(Value);
+    static const unsigned MAX_OBJ_SIZE = 5 * sizeof(void*) + 16 * sizeof(Value);
 
     static void staticAsserts() {
         JS_STATIC_ASSERT(NewObjectCache::MAX_OBJ_SIZE == sizeof(JSObject_Slots16));
@@ -263,12 +263,20 @@ class NewObjectCache
         entry->key = key;
         entry->kind = kind;
 
+#ifdef OMR
+        entry->nbytes = gc::OmrGcHelper::thingSize(kind);
+#else
         entry->nbytes = gc::Arena::thingSize(kind);
+#endif
         js_memcpy(&entry->templateObject, obj, entry->nbytes);
     }
 
     static void copyCachedToObject(NativeObject* dst, NativeObject* src, gc::AllocKind kind) {
+#ifdef OMR
+        js_memcpy(dst, src, gc::OmrGcHelper::thingSize(kind));
+#else
         js_memcpy(dst, src, gc::Arena::thingSize(kind));
+#endif
         Shape::writeBarrierPost(&dst->shape_, nullptr, dst->shape_);
         ObjectGroup::writeBarrierPost(&dst->group_, nullptr, dst->group_);
     }

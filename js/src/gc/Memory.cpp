@@ -62,6 +62,9 @@ static void* MapAlignedPagesLastDitch(size_t size, size_t alignment);
 size_t
 SystemPageSize()
 {
+	if (pageSize == 0) {
+		InitMemorySubsystem();
+	}
     return pageSize;
 }
 
@@ -790,6 +793,10 @@ void*
 AllocateMappedContent(int fd, size_t offset, size_t length, size_t alignment)
 {
     MOZ_ASSERT(length && alignment);
+	
+	if (pageSize == 0) {
+		InitMemorySubsystem();
+	}
 
     // The allocation granularity and the requested offset
     // must both be divisible by the requested alignment.

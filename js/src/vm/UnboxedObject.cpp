@@ -346,14 +346,17 @@ UnboxedPlainObject::ensureExpando(JSContext* cx, Handle<UnboxedPlainObject*> obj
     // Otherwise barriers triggered on the original object for writes to the
     // expando (as can happen in the JIT) won't see the tenured->nursery edge.
     // See WholeCellEdges::mark.
-    MOZ_ASSERT_IF(!IsInsideNursery(expando), !IsInsideNursery(obj));
+    //MOZ_ASSERT_IF(!IsInsideNursery(expando), !IsInsideNursery(obj));
 
     // As with setValue(), we need to manually trigger post barriers on the
     // whole object. If we treat the field as a GCPtrObject and later
     // convert the object to its native representation, we will end up with a
     // corrupted store buffer entry.
+#ifndef OMR
+    // OMRTODO: Writebarrier here
     if (IsInsideNursery(expando) && !IsInsideNursery(obj))
         cx->runtime()->gc.storeBuffer.putWholeCell(obj);
+#endif // OMR
 
     obj->expando_ = expando;
     return expando;
@@ -579,8 +582,11 @@ UnboxedPlainObject::convertToNative(JSContext* cx, JSObject* obj)
     // store buffer entries can be added on the original unboxed object for
     // writes to the expando (see WholeCellEdges::trace), so after conversion
     // we need to make sure the expando itself will still be traced.
+#ifndef OMR
+    // OMRTODO: Writebarrier here
     if (expando && !IsInsideNursery(expando))
         cx->runtime()->gc.storeBuffer.putWholeCell(expando);
+#endif // OMR
 
     obj->setGroup(layout.nativeGroup());
     obj->as<PlainObject>().setLastPropertyMakeNative(cx, layout.nativeShape());
@@ -1181,7 +1187,7 @@ UnboxedArrayObject::objectMoved(JSObject* obj, const JSObject* old)
 /* static */ void
 UnboxedArrayObject::finalize(FreeOp* fop, JSObject* obj)
 {
-    MOZ_ASSERT(!IsInsideNursery(obj));
+    //MOZ_ASSERT(!IsInsideNursery(obj));
     if (!obj->as<UnboxedArrayObject>().hasInlineElements())
         js_free(obj->as<UnboxedArrayObject>().elements());
 }
@@ -1943,7 +1949,7 @@ js::TryConvertToUnboxedLayout(ExclusiveContext* cx, AutoEnterAnalysis& enter, Sh
 
     MOZ_ASSERT_IF(templateShape, !templateShape->getObjectFlags());
 
-    if (group->runtimeFromAnyThread()->isSelfHostingGlobal(cx->global()))
+    if (cx->zone()->runtimeFromAnyThread()->isSelfHostingGlobal(cx->global()))
         return true;
 
     if (!isArray && templateShape->slotSpan() == 0)

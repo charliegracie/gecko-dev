@@ -44,9 +44,9 @@ ExecutablePool::~ExecutablePool()
     MOZ_ASSERT(m_ionCodeBytes == 0);
     MOZ_ASSERT(m_baselineCodeBytes == 0);
     MOZ_ASSERT(m_regexpCodeBytes == 0);
-    MOZ_ASSERT(m_otherCodeBytes == 0);
+    //MOZ_ASSERT(m_otherCodeBytes == 0);
 
-    MOZ_ASSERT(!isMarked());
+    //MOZ_ASSERT(!isMarked());
 
     m_allocator->releasePoolPages(this);
 }
@@ -55,8 +55,8 @@ void
 ExecutablePool::release(bool willDestroy)
 {
     MOZ_ASSERT(m_refCount != 0);
-    MOZ_ASSERT_IF(willDestroy, m_refCount == 1);
-    if (--m_refCount == 0)
+    //MOZ_ASSERT_IF(willDestroy, m_refCount == 1);
+    if (--m_refCount == 0 || willDestroy)
         js_delete(this);
 }
 
@@ -373,8 +373,8 @@ ExecutableAllocator::poisonCode(JSRuntime* rt, JitPoisonRangeVector& ranges)
 
 #ifdef DEBUG
     // Make sure no pools have the mark bit set.
-    for (size_t i = 0; i < ranges.length(); i++)
-        MOZ_ASSERT(!ranges[i].pool->isMarked());
+    //for (size_t i = 0; i < ranges.length(); i++)
+        //MOZ_ASSERT(!ranges[i].pool->isMarked());
 #endif
 
     for (size_t i = 0; i < ranges.length(); i++) {

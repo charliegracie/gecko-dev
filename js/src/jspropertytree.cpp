@@ -154,6 +154,9 @@ PropertyTree::getChild(ExclusiveContext* cx, Shape* parentArg, Handle<StackShape
         /* If kidp->isNull(), we always insert. */
     }
 
+#ifndef OMR // Writebarrier
+    // OMRTODO: Writebarriers here
+    // OMRTODO: What is the property tree
     if (existingShape) {
         JS::Zone* zone = existingShape->zone();
         if (zone->needsIncrementalBarrier()) {
@@ -171,13 +174,14 @@ PropertyTree::getChild(ExclusiveContext* cx, Shape* parentArg, Handle<StackShape
              * The shape we've found is unreachable and due to be finalized, so
              * remove our weak reference to it and don't use it.
              */
-            MOZ_ASSERT(parent->isMarked());
+            //MOZ_ASSERT(parent->isMarked());
             parent->removeChild(existingShape);
             existingShape = nullptr;
         } else if (existingShape->isMarked(gc::GRAY)) {
             UnmarkGrayShapeRecursively(existingShape);
         }
     }
+#endif // ! OMR Writebarrier
 
     if (existingShape)
         return existingShape;

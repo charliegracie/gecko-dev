@@ -68,20 +68,15 @@ template <typename Key,
           typename AllocPolicy = TempAllocPolicy>
 class NurseryAwareHashMap
 {
-    using BarrieredValue = detail::UnsafeBareReadBarriered<Value>;
-    using MapType = GCRekeyableHashMap<Key, BarrieredValue, HashPolicy, AllocPolicy>;
-    MapType map;
-
-    // Keep a list of all keys for which JS::GCPolicy<Key>::isTenured is false.
-    // This lets us avoid a full traveral of the map on each minor GC, keeping
-    // the minor GC times proportional to the nursery heap size.
-    Vector<Key, 0, AllocPolicy> nurseryEntries;
-
+	using BarrieredValue = detail::UnsafeBareReadBarriered<Value>;
+	using MapType = GCRekeyableHashMap<Key, BarrieredValue, HashPolicy, AllocPolicy>;
+	MapType map;
+	
   public:
     using Lookup = typename MapType::Lookup;
     using Ptr = typename MapType::Ptr;
     using Range = typename MapType::Range;
-
+	
     explicit NurseryAwareHashMap(AllocPolicy a = AllocPolicy()) : map(a) {}
 
     MOZ_MUST_USE bool init(uint32_t len = 16) { return map.init(len); }
@@ -103,58 +98,17 @@ class NurseryAwareHashMap
     MOZ_MUST_USE bool put(const Key& k, const Value& v) {
         auto p = map.lookupForAdd(k);
         if (p) {
-            if (!JS::GCPolicy<Key>::isTenured(k) || !JS::GCPolicy<Value>::isTenured(v)) {
-                if (!nurseryEntries.append(k))
-                    return false;
-            }
             p->value() = v;
             return true;
         }
-
-        bool ok = map.add(p, k, v);
-        if (!ok)
-            return false;
-
-        if (!JS::GCPolicy<Key>::isTenured(k) || !JS::GCPolicy<Value>::isTenured(v)) {
-            if (!nurseryEntries.append(k)) {
-                map.remove(k);
-                return false;
-            }
-        }
-
-        return true;
+        return map.add(p, k, v);
     }
 
     void sweepAfterMinorGC(JSTracer* trc) {
-        for (auto& key : nurseryEntries) {
-            auto p = map.lookup(key);
-            if (!p)
-                continue;
-
-            // Drop the entry if the value is not marked.
-            if (JS::GCPolicy<BarrieredValue>::needsSweep(&p->value())) {
-                map.remove(key);
-                continue;
-            }
-
-            // Update and relocate the key, if the value is still needed.
-            //
-            // Note that this currently assumes that all Value will contain a
-            // strong reference to Key, as per its use as the
-            // CrossCompartmentWrapperMap. We may need to make the following
-            // behavior more dynamic if we use this map in other nursery-aware
-            // contexts.
-            Key copy(key);
-            mozilla::DebugOnly<bool> sweepKey = JS::GCPolicy<Key>::needsSweep(&copy);
-            MOZ_ASSERT(!sweepKey);
-            map.rekeyIfMoved(key, copy);
-        }
-        nurseryEntries.clear();
     }
 
     void sweep() {
-        MOZ_ASSERT(nurseryEntries.empty());
-        map.sweep();
+		map.sweep();
     }
 };
 
@@ -167,10 +121,9 @@ struct GCPolicy<js::detail::UnsafeBareReadBarriered<T>>
     static void trace(JSTracer* trc, js::detail::UnsafeBareReadBarriered<T>* thingp,
                       const char* name)
     {
-        js::TraceEdge(trc, thingp, name);
     }
     static bool needsSweep(js::detail::UnsafeBareReadBarriered<T>* thingp) {
-        return js::gc::IsAboutToBeFinalized(thingp);
+        return false;
     }
 };
 } // namespace JS

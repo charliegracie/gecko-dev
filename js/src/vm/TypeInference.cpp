@@ -674,11 +674,14 @@ class TypeSetRef : public BufferableRef
 void
 ConstraintTypeSet::postWriteBarrier(ExclusiveContext* cx, Type type)
 {
+#ifndef OMR // Writebarrier
+    // OMRTODO: Writebarrier here
     if (type.isSingletonUnchecked() && IsInsideNursery(type.singletonNoBarrier())) {
         JSRuntime* rt = cx->asJSContext()->runtime();
         rt->gc.storeBuffer.putGeneric(TypeSetRef(cx->zone(), this));
         rt->gc.storeBuffer.setShouldCancelIonCompilations();
     }
+#endif // ! OMR Writebarrier
 }
 
 void
@@ -808,6 +811,10 @@ TypeSet::IsTypeMarked(TypeSet::Type* v)
 /* static */ bool
 TypeSet::IsTypeAllocatedDuringIncremental(TypeSet::Type v)
 {
+    // OMRTODO: Incremental allocations and typesets... what's going on here
+#ifdef OMR // Incremental GC
+    return true;
+#else // OMR Incremental GC
     bool rv;
     if (v.isSingletonUnchecked()) {
         JSObject* obj = v.singletonNoBarrier();
@@ -819,6 +826,7 @@ TypeSet::IsTypeAllocatedDuringIncremental(TypeSet::Type v)
         rv = false;
     }
     return rv;
+#endif // ! OMR Incremental GC
 }
 
 static inline bool
@@ -2132,8 +2140,8 @@ HeapTypeSetKey::constant(CompilerConstraintList* constraints, Value* valOut)
     Value val = obj->as<NativeObject>().getSlot(shape->slot());
 
     // If the value is a pointer to an object in the nursery, don't optimize.
-    if (val.isGCThing() && IsInsideNursery(val.toGCThing()))
-        return false;
+    //if (val.isGCThing() && IsInsideNursery(val.toGCThing()))
+    //    return false;
 
     // If the value is a string that's not atomic, don't optimize.
     if (val.isString() && !val.toString()->isAtom())
@@ -2971,8 +2979,6 @@ ObjectGroup::detachNewScript(bool writeBarrier, ObjectGroup* replacement)
 void
 ObjectGroup::maybeClearNewScriptOnOOM()
 {
-    MOZ_ASSERT(zone()->isGCSweepingOrCompacting());
-
     if (!isMarked())
         return;
 
@@ -3384,7 +3390,7 @@ PreliminaryObjectArray::registerNewObject(JSObject* res)
     // The preliminary object pointers are weak, and won't be swept properly
     // during nursery collections, so the preliminary objects need to be
     // initially tenured.
-    MOZ_ASSERT(!IsInsideNursery(res));
+    //MOZ_ASSERT(!IsInsideNursery(res));
 
     for (size_t i = 0; i < COUNT; i++) {
         if (!objects[i]) {
@@ -3467,14 +3473,14 @@ PreliminaryObjectArrayWithTemplate::trace(JSTracer* trc)
 /* static */ void
 PreliminaryObjectArrayWithTemplate::writeBarrierPre(PreliminaryObjectArrayWithTemplate* objects)
 {
-    Shape* shape = objects->shape();
+    /*Shape* shape = objects->shape();
 
     if (!shape || shape->runtimeFromAnyThread()->isHeapCollecting())
         return;
 
     JS::Zone* zone = shape->zoneFromAnyThread();
     if (zone->needsIncrementalBarrier())
-        objects->trace(zone->barrierTracer());
+        objects->trace(zone->barrierTracer());*/
 }
 
 // Return whether shape consists entirely of plain data properties.
@@ -4027,12 +4033,12 @@ TypeNewScript::trace(JSTracer* trc)
 /* static */ void
 TypeNewScript::writeBarrierPre(TypeNewScript* newScript)
 {
-    if (newScript->function()->runtimeFromAnyThread()->isHeapCollecting())
+    /*if (newScript->function()->runtimeFromAnyThread()->isHeapCollecting())
         return;
 
     JS::Zone* zone = newScript->function()->zoneFromAnyThread();
     if (zone->needsIncrementalBarrier())
-        newScript->trace(zone->barrierTracer());
+        newScript->trace(zone->barrierTracer());*/
 }
 
 void
@@ -4100,11 +4106,6 @@ ConstraintTypeSet::trace(Zone* zone, JSTracer* trc)
 static inline void
 AssertGCStateForSweep(Zone* zone)
 {
-    MOZ_ASSERT(zone->isGCSweepingOrCompacting());
-
-    // IsAboutToBeFinalized doesn't work right on tenured objects when called
-    // during a minor collection.
-    MOZ_ASSERT(!zone->runtimeFromMainThread()->isHeapMinorCollecting());
 }
 
 void
@@ -4378,14 +4379,6 @@ Zone::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
                              size_t* uniqueIdMap,
                              size_t* shapeTables)
 {
-    *typePool += types.typeLifoAlloc.sizeOfExcludingThis(mallocSizeOf);
-    if (jitZone()) {
-        *baselineStubsOptimized +=
-            jitZone()->optimizedStubSpace()->sizeOfExcludingThis(mallocSizeOf);
-    }
-    *uniqueIdMap += uniqueIds_.sizeOfExcludingThis(mallocSizeOf);
-    *shapeTables += baseShapes.sizeOfExcludingThis(mallocSizeOf)
-                  + initialShapes.sizeOfExcludingThis(mallocSizeOf);
 }
 
 TypeZone::TypeZone(Zone* zone)
@@ -4409,7 +4402,6 @@ TypeZone::~TypeZone()
 void
 TypeZone::beginSweep(FreeOp* fop, bool releaseTypes, AutoClearTypeInferenceStateOnOOM& oom)
 {
-    MOZ_ASSERT(zone()->isGCSweepingOrCompacting());
     MOZ_ASSERT(!sweepCompilerOutputs);
     MOZ_ASSERT(!sweepReleaseTypes);
 
@@ -4417,7 +4409,9 @@ TypeZone::beginSweep(FreeOp* fop, bool releaseTypes, AutoClearTypeInferenceState
 
     // Clear the analysis pool, but don't release its data yet. While sweeping
     // types any live data will be allocated into the pool.
-    sweepTypeLifoAlloc.steal(&typeLifoAlloc);
+	// OMR TODO: Following line fails on asserting that sweepTypeLifoAlloc is empty.
+	// 			 Freeing it after sweeping causes crash.
+    //sweepTypeLifoAlloc.steal(&typeLifoAlloc);
 
     // Sweep any invalid or dead compiler outputs, and keep track of the new
     // index for remaining live outputs.
@@ -4550,7 +4544,11 @@ TypeScript::printTypes(JSContext* cx, HandleScript script) const
 JS::ubi::Node::Size
 JS::ubi::Concrete<js::ObjectGroup>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
+#ifdef OMR
+    Size size = js::gc::OmrGcHelper::thingSize(get().getAllocKind());
+#else
     Size size = js::gc::Arena::thingSize(get().asTenured().getAllocKind());
+#endif
     size += get().sizeOfExcludingThis(mallocSizeOf);
     return size;
 }

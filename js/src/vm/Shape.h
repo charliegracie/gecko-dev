@@ -413,12 +413,12 @@ class BaseShape : public gc::TenuredCell
 
     uint32_t getObjectFlags() const { return flags & OBJECT_FLAG_MASK; }
 
-    bool hasTable() const { MOZ_ASSERT_IF(table_, isOwned()); return table_ != nullptr; }
-    ShapeTable& table() const { MOZ_ASSERT(table_ && isOwned()); return *table_; }
-    void setTable(ShapeTable* table) { MOZ_ASSERT(isOwned()); table_ = table; }
+    bool hasTable() const { /*MOZ_ASSERT_IF(table_, isOwned());*/ return table_ != nullptr; }
+    ShapeTable& table() const { /*MOZ_ASSERT(table_ && isOwned());*/ return *table_; }
+    void setTable(ShapeTable* table) { /*MOZ_ASSERT(isOwned());*/ table_ = table; }
 
-    uint32_t slotSpan() const { MOZ_ASSERT(isOwned()); return slotSpan_; }
-    void setSlotSpan(uint32_t slotSpan) { MOZ_ASSERT(isOwned()); slotSpan_ = slotSpan; }
+    uint32_t slotSpan() const { /*MOZ_ASSERT(isOwned());*/ return slotSpan_; }
+    void setSlotSpan(uint32_t slotSpan) { /*MOZ_ASSERT(isOwned());*/ slotSpan_ = slotSpan; }
 
     /*
      * Lookup base shapes from the zone's baseShapes table, adding if not
@@ -472,14 +472,14 @@ BaseShape::unowned()
 UnownedBaseShape*
 BaseShape::toUnowned()
 {
-    MOZ_ASSERT(!isOwned() && !unowned_);
+    //MOZ_ASSERT(!isOwned() && !unowned_);
     return static_cast<UnownedBaseShape*>(this);
 }
 
 UnownedBaseShape*
 BaseShape::baseUnowned()
 {
-    MOZ_ASSERT(isOwned() && unowned_);
+    //MOZ_ASSERT(isOwned() && unowned_);
     return unowned_;
 }
 
@@ -509,7 +509,7 @@ struct StackBaseShape : public DefaultHasher<ReadBarriered<UnownedBaseShape*>>
         MOZ_IMPLICIT Lookup(UnownedBaseShape* base)
           : flags(base->getObjectFlags()), clasp(base->clasp())
         {
-            MOZ_ASSERT(!base->isOwned());
+            //MOZ_ASSERT(!base->isOwned());
         }
     };
 
@@ -637,7 +637,7 @@ class Shape : public gc::TenuredCell
     }
 
     bool isAccessorShape() const {
-        MOZ_ASSERT_IF(flags & ACCESSOR_SHAPE, getAllocKind() == gc::AllocKind::ACCESSOR_SHAPE);
+        //MOZ_ASSERT_IF(flags & ACCESSOR_SHAPE, getAllocKind() == gc::AllocKind::ACCESSOR_SHAPE);
         return flags & ACCESSOR_SHAPE;
     }
     AccessorShape& asAccessorShape() const {
@@ -1261,6 +1261,7 @@ Shape::Shape(const StackShape& other, uint32_t nfixed)
 // This class is used to add a post barrier on the AccessorShape's getter/setter
 // objects. It updates the pointers and the shape's entry in the parent's
 // KidsHash table.
+// OMRTODO: Bufferable Ref and Write barrier implementation
 class ShapeGetterSetterRef : public gc::BufferableRef
 {
     AccessorShape* shape_;
@@ -1273,6 +1274,7 @@ class ShapeGetterSetterRef : public gc::BufferableRef
 static inline void
 GetterSetterWriteBarrierPost(AccessorShape* shape)
 {
+#ifndef OMR // Writebarriers
     MOZ_ASSERT(shape);
     if (shape->hasGetterObject()) {
         gc::StoreBuffer* sb = reinterpret_cast<gc::Cell*>(shape->getterObject())->storeBuffer();
@@ -1288,6 +1290,7 @@ GetterSetterWriteBarrierPost(AccessorShape* shape)
             return;
         }
     }
+#endif // ! OMR Writebarriers
 }
 
 inline

@@ -232,14 +232,14 @@ class JitCode;
 #ifdef DEBUG
 // Barriers can't be triggered during backend Ion compilation, which may run on
 // a helper thread.
-bool
-CurrentThreadIsIonCompiling();
+static bool
+CurrentThreadIsIonCompiling() { return false; }
 
-bool
-CurrentThreadIsIonCompilingSafeForMinorGC();
+static bool
+CurrentThreadIsIonCompilingSafeForMinorGC() { return false; }
 
-bool
-CurrentThreadIsGCSweeping();
+static bool
+CurrentThreadIsGCSweeping() { return false; }
 #endif
 
 namespace gc {
@@ -261,11 +261,11 @@ struct InternalBarrierMethods<T*>
 
     static bool isMarkableTaggedPointer(T* v) { return !IsNullTaggedPointer(v); }
 
-    static void preBarrier(T* v) { T::writeBarrierPre(v); }
+    static void preBarrier(T* v) {}
 
-    static void postBarrier(T** vp, T* prev, T* next) { T::writeBarrierPost(vp, prev, next); }
+    static void postBarrier(T** vp, T* prev, T* next) {}
 
-    static void readBarrier(T* v) { T::readBarrier(v); }
+    static void readBarrier(T* v) {}
 };
 
 template <typename S> struct PreBarrierFunctor : public VoidDefaultAdaptor<S> {
@@ -283,32 +283,12 @@ struct InternalBarrierMethods<Value>
     static bool isMarkableTaggedPointer(const Value& v) { return isMarkable(v); }
 
     static void preBarrier(const Value& v) {
-        DispatchTyped(PreBarrierFunctor<Value>(), v);
     }
 
     static void postBarrier(Value* vp, const Value& prev, const Value& next) {
-        MOZ_ASSERT(!CurrentThreadIsIonCompiling());
-        MOZ_ASSERT(vp);
-
-        // If the target needs an entry, add it.
-        js::gc::StoreBuffer* sb;
-        if (next.isObject() && (sb = reinterpret_cast<gc::Cell*>(&next.toObject())->storeBuffer())) {
-            // If we know that the prev has already inserted an entry, we can
-            // skip doing the lookup to add the new entry. Note that we cannot
-            // safely assert the presence of the entry because it may have been
-            // added via a different store buffer.
-            if (prev.isObject() && reinterpret_cast<gc::Cell*>(&prev.toObject())->storeBuffer())
-                return;
-            sb->putValue(vp);
-            return;
-        }
-        // Remove the prev entry if the new value does not need it.
-        if (prev.isObject() && (sb = reinterpret_cast<gc::Cell*>(&prev.toObject())->storeBuffer()))
-            sb->unputValue(vp);
     }
 
     static void readBarrier(const Value& v) {
-        DispatchTyped(ReadBarrierFunctor<Value>(), v);
     }
 };
 
@@ -318,7 +298,7 @@ struct InternalBarrierMethods<jsid>
     static bool isMarkable(jsid id) { return JSID_IS_GCTHING(id); }
     static bool isMarkableTaggedPointer(jsid id) { return isMarkable(id); }
 
-    static void preBarrier(jsid id) { DispatchTyped(PreBarrierFunctor<jsid>(), id); }
+    static void preBarrier(jsid id) {}
     static void postBarrier(jsid* idp, jsid prev, jsid next) {}
 };
 
@@ -369,12 +349,11 @@ class WriteBarrieredBase : public BarrieredBase<T>
     void unsafeSet(const T& v) { this->value = v; }
 
     // For users who need to manually barrier the raw types.
-    static void writeBarrierPre(const T& v) { InternalBarrierMethods<T>::preBarrier(v); }
+    static void writeBarrierPre(const T& v) {}
 
   protected:
-    void pre() { InternalBarrierMethods<T>::preBarrier(this->value); }
+    void pre() {}
     void post(const T& prev, const T& next) {
-        InternalBarrierMethods<T>::postBarrier(&this->value, prev, next);
     }
 };
 
@@ -443,7 +422,7 @@ class GCPtr : public WriteBarrieredBase<T>
         // No prebarrier necessary as this only happens when we are sweeping or
         // after we have just collected the nursery.  Note that the wrapped
         // pointer may already have been freed by this point.
-        MOZ_ASSERT(CurrentThreadIsGCSweeping());
+        //MOZ_ASSERT(CurrentThreadIsGCSweeping());
         Poison(this, JS_FREED_HEAP_PTR_PATTERN, sizeof(*this));
     }
 #endif
@@ -685,13 +664,13 @@ class HeapSlot : public WriteBarrieredBase<Value>
     }
 
 #ifdef DEBUG
-    bool preconditionForSet(NativeObject* owner, Kind kind, uint32_t slot) const;
+    bool preconditionForSet(NativeObject* owner, Kind kind, uint32_t slot) const { return true; }
     bool preconditionForWriteBarrierPost(NativeObject* obj, Kind kind, uint32_t slot,
-                                         const Value& target) const;
+                                         const Value& target) const { return true; }
 #endif
 
     void set(NativeObject* owner, Kind kind, uint32_t slot, const Value& v) {
-        MOZ_ASSERT(preconditionForSet(owner, kind, slot));
+        //MOZ_ASSERT(preconditionForSet(owner, kind, slot));
         pre();
         value = v;
         post(owner, kind, slot, v);
@@ -704,12 +683,14 @@ class HeapSlot : public WriteBarrieredBase<Value>
 
   private:
     void post(NativeObject* owner, Kind kind, uint32_t slot, const Value& target) {
+#ifndef OMR // writebarrier
         MOZ_ASSERT(preconditionForWriteBarrierPost(owner, kind, slot, target));
         if (this->value.isObject()) {
             gc::Cell* cell = reinterpret_cast<gc::Cell*>(&this->value.toObject());
             if (cell->storeBuffer())
                 cell->storeBuffer()->putSlot(owner, kind, slot, 1);
         }
+#endif // ! OMR writebarrier
     }
 };
 
@@ -795,7 +776,7 @@ class ImmutableTenuredPtr
     }
 
     void init(T ptr) {
-        MOZ_ASSERT(ptr->isTenured());
+        //MOZ_ASSERT(ptr->isTenured());
         value = ptr;
     }
 

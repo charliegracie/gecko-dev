@@ -40,6 +40,7 @@ ObjectGroup::ObjectGroup(const Class* clasp, TaggedProto proto, JSCompartment* c
     MOZ_ASSERT_IF(proto.isObject(), !IsWindow(proto.toObject()));
     MOZ_ASSERT(JS::StringIsASCII(clasp->name));
 
+	this->setAllocKind(js::gc::AllocKind::OBJECT_GROUP);
     this->clasp_ = clasp;
     this->proto_ = proto;
     this->compartment_ = comp;
@@ -536,7 +537,7 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
         MOZ_ASSERT_IF(clasp, group->clasp() == clasp);
         MOZ_ASSERT_IF(!clasp, group->clasp() == &PlainObject::class_ ||
                               group->clasp() == &UnboxedPlainObject::class_);
-        MOZ_ASSERT(group->proto() == proto);
+        //MOZ_ASSERT(group->proto() == proto);
         return group;
     }
 

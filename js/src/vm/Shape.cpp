@@ -111,7 +111,7 @@ Shape::insertIntoDictionary(GCPtrShape* dictp)
 bool
 Shape::makeOwnBaseShape(ExclusiveContext* cx)
 {
-    MOZ_ASSERT(!base()->isOwned());
+    //MOZ_ASSERT(!base()->isOwned());
     MOZ_ASSERT(cx->zone() == zone());
 
     BaseShape* nbase = Allocate<BaseShape, NoGC>(cx);
@@ -134,7 +134,7 @@ Shape::handoffTableTo(Shape* shape)
     if (this == shape)
         return;
 
-    MOZ_ASSERT(base()->isOwned() && !shape->base()->isOwned());
+    //MOZ_ASSERT(base()->isOwned() && !shape->base()->isOwned());
 
     BaseShape* nbase = base();
 
@@ -1280,7 +1280,7 @@ BaseShape::adoptUnowned(UnownedBaseShape* other)
 {
     // This is a base shape owned by a dictionary object, update it to reflect the
     // unowned base shape of a new last property.
-    MOZ_ASSERT(isOwned());
+    //MOZ_ASSERT(isOwned());
 
     uint32_t span = slotSpan();
     ShapeTable* table = &this->table();
@@ -1640,7 +1640,11 @@ AutoRooterGetterSetter::Inner::trace(JSTracer* trc)
 JS::ubi::Node::Size
 JS::ubi::Concrete<js::Shape>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
+#ifdef OMR
+    Size size = js::gc::OmrGcHelper::thingSize(get().getAllocKind());
+#else
     Size size = js::gc::Arena::thingSize(get().asTenured().getAllocKind());
+ #endif
 
     if (get().hasTable())
         size += get().table().sizeOfIncludingThis(mallocSizeOf);
@@ -1654,5 +1658,9 @@ JS::ubi::Concrete<js::Shape>::size(mozilla::MallocSizeOf mallocSizeOf) const
 JS::ubi::Node::Size
 JS::ubi::Concrete<js::BaseShape>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
+#ifdef OMR
+    return js::gc::OmrGcHelper::thingSize(get().getAllocKind());
+#else
     return js::gc::Arena::thingSize(get().asTenured().getAllocKind());
+#endif
 }

@@ -66,7 +66,7 @@ SetUnboxedValueNoTypeChange(JSObject* unboxedObject,
         return;
 
       case JSVAL_TYPE_STRING: {
-        MOZ_ASSERT(!IsInsideNursery(v.toString()));
+        //MOZ_ASSERT(!IsInsideNursery(v.toString()));
         JSString** np = reinterpret_cast<JSString**>(p);
         if (preBarrier)
             JSString::writeBarrierPre(*np);
@@ -81,6 +81,7 @@ SetUnboxedValueNoTypeChange(JSObject* unboxedObject,
         // the pointer as a HeapPtrObject we will get confused later if the
         // object is converted to its native representation.
         JSObject* obj = v.toObjectOrNull();
+#ifndef OMR // Writebarriers
         if (IsInsideNursery(obj) && !IsInsideNursery(unboxedObject)) {
             JSRuntime* rt = unboxedObject->runtimeFromMainThread();
             rt->gc.storeBuffer.putWholeCell(unboxedObject);
@@ -88,6 +89,8 @@ SetUnboxedValueNoTypeChange(JSObject* unboxedObject,
 
         if (preBarrier)
             JSObject::writeBarrierPre(*np);
+#endif // ! OMR Writebarriers
+
         *np = obj;
         return;
       }
@@ -125,7 +128,7 @@ SetUnboxedValue(ExclusiveContext* cx, JSObject* unboxedObject, jsid id,
 
       case JSVAL_TYPE_STRING:
         if (v.isString()) {
-            MOZ_ASSERT(!IsInsideNursery(v.toString()));
+            //MOZ_ASSERT(!IsInsideNursery(v.toString()));
             JSString** np = reinterpret_cast<JSString**>(p);
             if (preBarrier)
                 JSString::writeBarrierPre(*np);
@@ -145,6 +148,8 @@ SetUnboxedValue(ExclusiveContext* cx, JSObject* unboxedObject, jsid id,
 
             // As above, trigger post barriers on the whole object.
             JSObject* obj = v.toObjectOrNull();
+
+#ifndef OMR // Writebarriers
             if (IsInsideNursery(v.toObjectOrNull()) && !IsInsideNursery(unboxedObject)) {
                 JSRuntime* rt = unboxedObject->runtimeFromMainThread();
                 rt->gc.storeBuffer.putWholeCell(unboxedObject);
@@ -152,6 +157,8 @@ SetUnboxedValue(ExclusiveContext* cx, JSObject* unboxedObject, jsid id,
 
             if (preBarrier)
                 JSObject::writeBarrierPre(*np);
+#endif // ! OMR Writebarriers
+
             *np = obj;
             return true;
         }
@@ -619,8 +626,11 @@ CopyBoxedOrUnboxedDenseElements(JSContext* cx, JSObject* dst, JSObject* src,
                length * elementSize);
 
         // Add a store buffer entry if we might have copied a nursery pointer to dst.
-        if (UnboxedTypeNeedsPostBarrier(DstType) && !IsInsideNursery(dst))
+#ifndef OMR // Writebarriers
+        if (UnboxedTypeNeedsPostBarrier(DstType) && !IsInsideNursery(dst)) {
             dst->runtimeFromMainThread()->gc.storeBuffer.putWholeCell(dst);
+        }
+#endif // ! OMR Writebarriers
     } else if (DstType == JSVAL_TYPE_DOUBLE && SrcType == JSVAL_TYPE_INT32) {
         uint8_t* dstData = dst->as<UnboxedArrayObject>().elements();
         uint8_t* srcData = src->as<UnboxedArrayObject>().elements();

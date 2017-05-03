@@ -98,6 +98,35 @@
 #include "vm/SavedStacks-inl.h"
 #include "vm/String-inl.h"
 
+#if defined(OMR)
+
+#include <stdlib.h>
+
+#include "omr.h"
+#include "omrport.h"
+#if defined(OMR_GC)
+#include "mminitcore.h"
+#endif /* defined(OMR_GC) */
+#include "omrprofiler.h"
+#include "omrrasinit.h"
+#include "omrvm.h"
+#include "thread_api.h"
+#include "omrutil.h"
+
+#if defined(OMR_GC)
+#include "GCExtensionsBase.hpp"
+#include "Heap.hpp"
+#include "omrgcstartup.hpp"
+#include "StartupManagerImpl.hpp"
+#endif /* OMR_GC */
+#include "OMR_VMThread.hpp"
+
+#else
+
+#error OMR_NOT_ENABLED
+
+#endif /* defined(OMR) */
+
 using namespace js;
 using namespace js::gc;
 
@@ -456,6 +485,14 @@ JS::isGCEnabled()
 JS_FRIEND_API(bool) JS::isGCEnabled() { return true; }
 #endif
 
+#if defined(OMR)
+
+static omr_error_t InitializeOMR()
+{
+    return OMR_Initialize_VM(&Nursery::omrVM, &Nursery::omrVMThread, NULL, NULL);
+}
+#endif /* defined(OMR) */
+
 JS_PUBLIC_API(JSContext*)
 JS_NewContext(uint32_t maxbytes, uint32_t maxNurseryBytes, JSContext* parentContext)
 {
@@ -470,12 +507,26 @@ JS_NewContext(uint32_t maxbytes, uint32_t maxNurseryBytes, JSContext* parentCont
             parentRuntime = parentRuntime->parentRuntime;
     }
 
-    return NewContext(maxbytes, maxNurseryBytes, parentRuntime);
+	JS_PUBLIC_API(JSContext*) cx = NewContext(maxbytes, maxNurseryBytes, parentRuntime);
+#if defined(OMR)
+	omr_error_t rc = InitializeOMR();
+	Nursery::omrVM->_language_vm = cx->runtime();
+#endif /* defined(OMR) */
+	return cx;
 }
+
+#if defined(OMR)
+static omr_error_t TearDownOMR() {
+    OMR_Shutdown_VM(Nursery::omrVM, Nursery::omrVMThread);
+}
+#endif /* defined(OMR) */
 
 JS_PUBLIC_API(void)
 JS_DestroyContext(JSContext* cx)
 {
+#if defined(OMR)
+    TearDownOMR();
+#endif /* defined(OMR) */
     DestroyContext(cx);
 }
 

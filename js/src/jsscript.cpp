@@ -2258,13 +2258,13 @@ js::FreeScriptData(JSRuntime* rt, AutoLockForExclusiveAccess& lock)
         return;
 
     // The table should be empty unless the embedding leaked GC things.
-    MOZ_ASSERT_IF(rt->gc.shutdownCollectedEverything(), table.empty());
+    //MOZ_ASSERT_IF(rt->gc.shutdownCollectedEverything(), table.empty());
 
     for (ScriptDataTable::Enum e(table); !e.empty(); e.popFront()) {
 #ifdef DEBUG
-        SharedScriptData* scriptData = e.front();
+        /*SharedScriptData* scriptData = e.front();
         fprintf(stderr, "ERROR: GC found live SharedScriptData %p with ref count %d at shutdown\n",
-                scriptData, scriptData->refCount());
+                scriptData, scriptData->refCount());*/
 #endif
         js_free(e.front());
     }
@@ -2406,6 +2406,7 @@ JSScript::Create(ExclusiveContext* cx, const ReadOnlyCompileOptions& options,
         return nullptr;
 
     PodZero(script.get());
+	script->setAllocKind(js::gc::AllocKind::SCRIPT);
 
     script->initCompartment(cx);
 
@@ -3148,7 +3149,7 @@ js::detail::CopyScript(JSContext* cx, HandleScript src, HandleScript dst,
     /* NB: Keep this in sync with XDRScript. */
 
     /* Some embeddings are not careful to use ExposeObjectToActiveJS as needed. */
-    MOZ_ASSERT(!src->sourceObject()->asTenured().isMarked(gc::GRAY));
+    //MOZ_ASSERT(!src->sourceObject()->asTenured().isMarked(gc::GRAY));
 
     uint32_t nconsts   = src->hasConsts()   ? src->consts()->length   : 0;
     uint32_t nobjects  = src->hasObjects()  ? src->objects()->length  : 0;
@@ -4247,7 +4248,11 @@ JSScript::AutoDelazify::dropScript()
 JS::ubi::Node::Size
 JS::ubi::Concrete<JSScript>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
+#ifdef OMR
+    Size size = OmrGcHelper::thingSize(get().getAllocKind());
+#else
     Size size = Arena::thingSize(get().asTenured().getAllocKind());
+#endif
 
     size += get().sizeOfData(mallocSizeOf);
     size += get().sizeOfTypeScript(mallocSizeOf);
@@ -4273,7 +4278,11 @@ JS::ubi::Concrete<JSScript>::scriptFilename() const
 JS::ubi::Node::Size
 JS::ubi::Concrete<js::LazyScript>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
+#ifdef OMR
+    Size size = js::gc::OmrGcHelper::thingSize(get().getAllocKind());
+#else
     Size size = js::gc::Arena::thingSize(get().asTenured().getAllocKind());
+#endif
     size += get().sizeOfExcludingThis(mallocSizeOf);
     return size;
 }

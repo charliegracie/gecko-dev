@@ -68,7 +68,7 @@ class CompartmentChecker
     }
 
     void check(JSObject* obj) {
-        MOZ_ASSERT_IF(obj, IsInsideNursery(obj) || !obj->asTenured().isMarked(gc::GRAY));
+        //MOZ_ASSERT_IF(obj, IsInsideNursery(obj) || !obj->asTenured().isMarked(gc::GRAY));
         if (obj)
             check(obj->compartment());
     }
@@ -84,9 +84,16 @@ class CompartmentChecker
     }
 
     void check(JSString* str) {
-        MOZ_ASSERT(!str->isMarked(gc::GRAY));
+#ifdef OMR
+        // OMRTODO: Obtain zone from context
+        // OMRTODO: What is checkZone, anyways?
+        if (!str->isAtom()) {
+            checkZone(gc::OmrGcHelper::zone);
+        }
+#else // OMR
         if (!str->isAtom())
             checkZone(str->zone());
+#endif // ! OMR
     }
 
     void check(const js::Value& v) {
@@ -119,7 +126,7 @@ class CompartmentChecker
     void check(jsid id) {}
 
     void check(JSScript* script) {
-        MOZ_ASSERT_IF(script, !script->isMarked(gc::GRAY));
+        //MOZ_ASSERT_IF(script, !script->isMarked(gc::GRAY));
         if (script)
             check(script->compartment());
     }
@@ -435,8 +442,8 @@ js::ExclusiveContext::setCompartment(JSCompartment* comp,
     MOZ_ASSERT_IF(runtime_->isAtomsCompartment(comp), maybeLock != nullptr);
 
     // Make sure that the atoms compartment has its own zone.
-    MOZ_ASSERT_IF(comp && !runtime_->isAtomsCompartment(comp),
-                  !comp->zone()->isAtomsZone());
+    //MOZ_ASSERT_IF(comp && !runtime_->isAtomsCompartment(comp),
+    //              !comp->zone()->isAtomsZone());
 
     // Both the current and the new compartment should be properly marked as
     // entered at this point.
@@ -445,7 +452,9 @@ js::ExclusiveContext::setCompartment(JSCompartment* comp,
 
     compartment_ = comp;
     zone_ = comp ? comp->zone() : nullptr;
+#ifndef OMR // Arenas
     arenas_ = zone_ ? &zone_->arenas : nullptr;
+#endif // ! OMR Arenas
 }
 
 inline JSScript*

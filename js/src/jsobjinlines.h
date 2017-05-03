@@ -123,7 +123,7 @@ js::NativeObject::sweepDictionaryListPointer()
 /* static */ inline bool
 JSObject::setSingleton(js::ExclusiveContext* cx, js::HandleObject obj)
 {
-    MOZ_ASSERT_IF(cx->isJSContext(), !IsInsideNursery(obj));
+    //MOZ_ASSERT_IF(cx->isJSContext(), !IsInsideNursery(obj));
 
     js::ObjectGroup* group = js::ObjectGroup::lazySingletonGroup(cx, obj->getClass(),
                                                                  obj->taggedProto());
@@ -330,8 +330,8 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
     MOZ_ASSERT(shape && group);
     MOZ_ASSERT(clasp == shape->getObjectClass());
     MOZ_ASSERT(clasp != &js::ArrayObject::class_);
-    MOZ_ASSERT_IF(!js::ClassCanHaveFixedData(clasp),
-                  js::gc::GetGCKindSlots(kind, clasp) == shape->numFixedSlots());
+    //MOZ_ASSERT_IF(!js::ClassCanHaveFixedData(clasp),
+                  //js::gc::GetGCKindSlots(kind, clasp) == shape->numFixedSlots());
 
 #ifdef DEBUG
     static const uint32_t FinalizeMask = JSCLASS_FOREGROUND_FINALIZE | JSCLASS_BACKGROUND_FINALIZE;

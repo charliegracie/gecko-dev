@@ -147,7 +147,7 @@ TypedArrayObject::trace(JSTracer* trc, JSObject* objArg)
 void
 TypedArrayObject::finalize(FreeOp* fop, JSObject* obj)
 {
-    MOZ_ASSERT(!IsInsideNursery(obj));
+    //MOZ_ASSERT(!IsInsideNursery(obj));
     TypedArrayObject* curObj = &obj->as<TypedArrayObject>();
 
     // Typed arrays with a buffer object do not need to be free'd
@@ -181,7 +181,7 @@ TypedArrayObject::objectMovedDuringMinorGC(JSTracer* trc, JSObject* obj, const J
     TypedArrayObject* newObj = &obj->as<TypedArrayObject>();
     const TypedArrayObject* oldObj = &old->as<TypedArrayObject>();
     MOZ_ASSERT(newObj->elements() == oldObj->elements());
-    MOZ_ASSERT(obj->isTenured());
+    //MOZ_ASSERT(obj->isTenured());
 
     // Typed arrays with a buffer object do not need an update.
     if (oldObj->hasBuffer())
@@ -502,10 +502,13 @@ class TypedArrayObjectTemplate : public TypedArrayObject
                 // nursery chunk, and a zero-length buffer will erroneously be
                 // perceived as being inside the nursery; sidestep that.
                 if (isSharedMemory) {
-                    MOZ_ASSERT(buffer->byteLength() == 0 &&
-                               (uintptr_t(ptr.unwrapValue()) & gc::ChunkMask) == 0);
+                    //MOZ_ASSERT(buffer->byteLength() == 0 &&
+                    //           (uintptr_t(ptr.unwrapValue()) & gc::ChunkMask) == 0);
                 } else {
+#ifndef OMR // Writebarrier
+                    // OMRTODO: Writebarrier here
                     cx->runtime()->gc.storeBuffer.putWholeCell(obj);
+#endif // ! OMR Writebarrier
                 }
             }
         } else {
@@ -606,9 +609,9 @@ class TypedArrayObjectTemplate : public TypedArrayObject
 
         if (buf) {
 #ifdef DEBUG
-            Nursery& nursery = cx->runtime()->gc.nursery;
-            MOZ_ASSERT_IF(!nursery.isInside(buf) && !tarray->hasInlineElements(),
-                          tarray->isTenured());
+            //Nursery& nursery = cx->runtime()->gc.nursery;
+            //MOZ_ASSERT_IF(!nursery.isInside(buf) && !tarray->hasInlineElements(),
+            //              tarray->isTenured());
 #endif
             tarray->initPrivate(buf);
         } else {
@@ -1583,8 +1586,11 @@ DataViewObject::create(JSContext* cx, uint32_t byteOffset, uint32_t byteLength,
 
     // Include a barrier if the data view's data pointer is in the nursery, as
     // is done for typed arrays.
+#ifndef OMR // Writebarrier
+    // OMRTODO: Writebarrier here
     if (!IsInsideNursery(obj) && cx->runtime()->gc.nursery.isInside(arrayBuffer->dataPointer()))
         cx->runtime()->gc.storeBuffer.putWholeCell(obj);
+#endif // ! OMR Writebarrier
 
     // Verify that the private slot is at the expected place
     MOZ_ASSERT(dvobj.numFixedSlots() == TypedArrayObject::DATA_SLOT);

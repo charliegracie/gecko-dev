@@ -472,6 +472,8 @@ MallocWrapper(JSRuntime* rt, size_t nbytes)
 JSObject*
 NewCallObject(JSContext* cx, HandleShape shape, HandleObjectGroup group)
 {
+    // OMRTODO: What is a CallObject?
+
     JSObject* obj = CallObject::create(cx, shape, group);
     if (!obj)
         return nullptr;
@@ -479,9 +481,11 @@ NewCallObject(JSContext* cx, HandleShape shape, HandleObjectGroup group)
     // The JIT creates call objects in the nursery, so elides barriers for
     // the initializing writes. The interpreter, however, may have allocated
     // the call object tenured, so barrier as needed before re-entering.
+#ifndef OMR
+    // OMRTODO: Writebarrier here
     if (!IsInsideNursery(obj))
         cx->runtime()->gc.storeBuffer.putWholeCell(obj);
-
+#endif // OMR
     return obj;
 }
 
@@ -495,10 +499,13 @@ NewSingletonCallObject(JSContext* cx, HandleShape shape)
     // The JIT creates call objects in the nursery, so elides barriers for
     // the initializing writes. The interpreter, however, may have allocated
     // the call object tenured, so barrier as needed before re-entering.
+#ifndef OMR
     MOZ_ASSERT(!IsInsideNursery(obj),
                "singletons are created in the tenured heap");
-    cx->runtime()->gc.storeBuffer.putWholeCell(obj);
 
+    // OMRTODO: Writebarrier here
+    cx->runtime()->gc.storeBuffer.putWholeCell(obj);
+#endif // OMR
     return obj;
 }
 
@@ -601,8 +608,11 @@ GetDynamicName(JSContext* cx, JSObject* envChain, JSString* str, Value* vp)
 void
 PostWriteBarrier(JSRuntime* rt, JSObject* obj)
 {
+#ifndef OMR
+    // OMRTODO: Writebarrier here
     MOZ_ASSERT(!IsInsideNursery(obj));
     rt->gc.storeBuffer.putWholeCell(obj);
+#endif // OMR
 }
 
 static const size_t MAX_WHOLE_CELL_BUFFER_SIZE = 4096;
@@ -610,6 +620,7 @@ static const size_t MAX_WHOLE_CELL_BUFFER_SIZE = 4096;
 void
 PostWriteElementBarrier(JSRuntime* rt, JSObject* obj, int32_t index)
 {
+#ifndef OMR // Writebarrier
     MOZ_ASSERT(!IsInsideNursery(obj));
     if (obj->is<NativeObject>() &&
         !obj->as<NativeObject>().isInWholeCellBuffer() &&
@@ -625,6 +636,7 @@ PostWriteElementBarrier(JSRuntime* rt, JSObject* obj, int32_t index)
     }
 
     rt->gc.storeBuffer.putWholeCell(obj);
+#endif // ! OMR Writebarrier
 }
 
 void
@@ -1169,17 +1181,17 @@ AssertValidObjectPtr(JSContext* cx, JSObject* obj)
     // Check what we can, so that we'll hopefully assert/crash if we get a
     // bogus object (pointer).
     MOZ_ASSERT(obj->compartment() == cx->compartment());
-    MOZ_ASSERT(obj->runtimeFromMainThread() == cx->runtime());
+    //MOZ_ASSERT(obj->runtimeFromMainThread() == cx->runtime());
 
     MOZ_ASSERT_IF(!obj->hasLazyGroup() && obj->maybeShape(),
                   obj->group()->clasp() == obj->maybeShape()->getObjectClass());
 
-    if (obj->isTenured()) {
+    /*if (obj->isTenured()) {
         MOZ_ASSERT(obj->isAligned());
         gc::AllocKind kind = obj->asTenured().getAllocKind();
         MOZ_ASSERT(gc::IsObjectAllocKind(kind));
         MOZ_ASSERT(obj->asTenured().zone() == cx->zone());
-    }
+    }*/
 #endif
 }
 
@@ -1195,7 +1207,7 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
 {
 #ifdef DEBUG
     // We can't closely inspect strings from another runtime.
-    if (str->runtimeFromAnyThread() != cx->runtime()) {
+    /*if (str->runtimeFromAnyThread() != cx->runtime()) {
         MOZ_ASSERT(str->isPermanentAtom());
         return;
     }
@@ -1206,7 +1218,7 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
         MOZ_ASSERT(str->zone() == cx->zone());
 
     MOZ_ASSERT(str->isAligned());
-    MOZ_ASSERT(str->length() <= JSString::MAX_LENGTH);
+    MOZ_ASSERT(str->length() <= JSString::MAX_LENGTH);*/
 
     gc::AllocKind kind = str->getAllocKind();
     if (str->isFatInline())
@@ -1224,13 +1236,13 @@ void
 AssertValidSymbolPtr(JSContext* cx, JS::Symbol* sym)
 {
     // We can't closely inspect symbols from another runtime.
-    if (sym->runtimeFromAnyThread() != cx->runtime()) {
+    /*if (sym->runtimeFromAnyThread() != cx->runtime()) {
         MOZ_ASSERT(sym->isWellKnownSymbol());
         return;
     }
 
     MOZ_ASSERT(sym->zone()->isAtomsZone());
-    MOZ_ASSERT(sym->isAligned());
+    MOZ_ASSERT(sym->isAligned());*/
     if (JSString* desc = sym->description()) {
         MOZ_ASSERT(desc->isAtom());
         AssertValidStringPtr(cx, desc);

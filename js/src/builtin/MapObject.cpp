@@ -198,7 +198,7 @@ MapIteratorObject::next(JSContext* cx, Handle<MapIteratorObject*> mapIterator,
     // Check invariants for inlined _GetNextMapEntryForIterator.
 
     // The array should be tenured, so that post-barrier can be done simply.
-    MOZ_ASSERT(resultPairObj->isTenured());
+    //MOZ_ASSERT(resultPairObj->isTenured());
 
     // The array elements should be fixed.
     MOZ_ASSERT(resultPairObj->hasFixedElements());
@@ -401,21 +401,27 @@ class OrderedHashTableRef : public gc::BufferableRef
 inline static void
 WriteBarrierPost(JSRuntime* rt, ValueMap* map, const Value& key)
 {
+#ifndef OMR
+    // OMRTODO: Writebarrier here
     typedef OrderedHashMap<Value, Value, UnbarrieredHashPolicy, RuntimeAllocPolicy> UnbarrieredMap;
     if (MOZ_UNLIKELY(key.isObject() && IsInsideNursery(&key.toObject()))) {
         rt->gc.storeBuffer.putGeneric(OrderedHashTableRef<UnbarrieredMap>(
                     reinterpret_cast<UnbarrieredMap*>(map), key));
     }
+#endif // OMR
 }
 
 inline static void
 WriteBarrierPost(JSRuntime* rt, ValueSet* set, const Value& key)
 {
+#ifndef OMR
+    // OMRTODO: Writebarrier here
     typedef OrderedHashSet<Value, UnbarrieredHashPolicy, RuntimeAllocPolicy> UnbarrieredSet;
     if (MOZ_UNLIKELY(key.isObject() && IsInsideNursery(&key.toObject()))) {
         rt->gc.storeBuffer.putGeneric(OrderedHashTableRef<UnbarrieredSet>(
                     reinterpret_cast<UnbarrieredSet*>(set), key));
     }
+#endif
 }
 
 bool

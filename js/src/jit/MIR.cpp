@@ -835,6 +835,10 @@ MakeUnknownTypeSet()
 bool
 jit::IonCompilationCanUseNurseryPointers()
 {
+    // OMRTODO: Nursery pointers aren't as much a thing in the GC
+#ifdef OMR
+    return true;
+#else // OMR
     // If we are doing backend compilation, which could occur on a helper
     // thread but might actually be on the main thread, check the flag set on
     // the PerThreadData by AutoEnterIonCompilation.
@@ -846,6 +850,7 @@ jit::IonCompilationCanUseNurseryPointers()
     // or in progress Ion compilations.
     JSRuntime* rt = TlsPerThreadData.get()->runtimeFromMainThread();
     return rt->gc.storeBuffer.cancelIonCompilations();
+#endif // OMR
 }
 
 #endif // DEBUG
@@ -880,7 +885,7 @@ MConstant::MConstant(const js::Value& vp, CompilerConstraintList* constraints)
         payload_.obj = &vp.toObject();
         // Create a singleton type set for the object. This isn't necessary for
         // other types as the result type encodes all needed information.
-        MOZ_ASSERT_IF(IsInsideNursery(&vp.toObject()), IonCompilationCanUseNurseryPointers());
+        //MOZ_ASSERT_IF(IsInsideNursery(&vp.toObject()), IonCompilationCanUseNurseryPointers());
         setResultTypeSet(MakeSingletonTypeSet(constraints, &vp.toObject()));
         break;
       case MIRType::MagicOptimizedArguments:
@@ -907,7 +912,7 @@ MConstant::MConstant(const js::Value& vp, CompilerConstraintList* constraints)
 
 MConstant::MConstant(JSObject* obj)
 {
-    MOZ_ASSERT_IF(IsInsideNursery(obj), IonCompilationCanUseNurseryPointers());
+    //MOZ_ASSERT_IF(IsInsideNursery(obj), IonCompilationCanUseNurseryPointers());
     setResultType(MIRType::Object);
     payload_.obj = obj;
     setMovable();

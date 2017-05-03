@@ -1045,10 +1045,10 @@ class CompilerGCPointer
     explicit CompilerGCPointer(T ptr)
       : ptr_(ptr)
     {
-        MOZ_ASSERT_IF(IsInsideNursery(ptr), IonCompilationCanUseNurseryPointers());
+        //MOZ_ASSERT_IF(IsInsideNursery(ptr), IonCompilationCanUseNurseryPointers());
 #ifdef DEBUG
-        PerThreadData* pt = TlsPerThreadData.get();
-        MOZ_ASSERT_IF(pt->runtimeIfOnOwnerThread(), pt->suppressGC);
+        //PerThreadData* pt = TlsPerThreadData.get();
+        //MOZ_ASSERT_IF(pt->runtimeIfOnOwnerThread(), pt->suppressGC);
 #endif
     }
 
